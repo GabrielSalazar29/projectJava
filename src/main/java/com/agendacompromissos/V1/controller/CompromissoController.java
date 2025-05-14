@@ -1,62 +1,123 @@
 package com.agendacompromissos.V1.controller;
 
 import com.agendacompromissos.V1.model.Compromisso;
+import com.agendacompromissos.V1.model.Usuario; // Importe Usuario
 import com.agendacompromissos.V1.service.CompromissoService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal; // Para injetar o usuário logado
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.web.server.ResponseStatusException; // Para exceções HTTP
+import java.time.LocalDateTime;
 import java.util.List;
 
-@RestController // Anotação para indicar que é um controlador REST
-@RequestMapping("/api/compromissos") // Define o caminho base para os endpoints deste controlador
+// DTO para receber dados de criação/atualização de compromisso
+// Não inclui o usuário, pois será pego do contexto de segurança
+class CompromissoDTO {
+    private String descricao;
+    private LocalDateTime dataHoraInicio;
+    private LocalDateTime dataHoraFim;
+    private String local;
+
+    // Getters e Setters
+    public String getDescricao() { return descricao; }
+    public void setDescricao(String descricao) { this.descricao = descricao; }
+    public LocalDateTime getDataHoraInicio() { return dataHoraInicio; }
+    public void setDataHoraInicio(LocalDateTime dataHoraInicio) { this.dataHoraInicio = dataHoraInicio; }
+    public LocalDateTime getDataHoraFim() { return dataHoraFim; }
+    public void setDataHoraFim(LocalDateTime dataHoraFim) { this.dataHoraFim = dataHoraFim; }
+    public String getLocal() { return local; }
+    public void setLocal(String local) { this.local = local; }
+
+    // Método para converter DTO para Entidade (sem o usuário)
+    public Compromisso toEntity() {
+        Compromisso compromisso = new Compromisso();
+        compromisso.setDescricao(this.descricao);
+        compromisso.setDataHoraInicio(this.dataHoraInicio);
+        compromisso.setDataHoraFim(this.dataHoraFim);
+        compromisso.setLocal(this.local);
+        return compromisso;
+    }
+}
+
+
+@RestController
+@RequestMapping("/api/compromissos")
 public class CompromissoController {
 
     private final CompromissoService compromissoService;
 
-    @Autowired // Injeção de dependência do serviço
+    @Autowired
     public CompromissoController(CompromissoService compromissoService) {
         this.compromissoService = compromissoService;
     }
 
-    @GetMapping // HTTP GET para /api/compromissos
-    public ResponseEntity<List<Compromisso>> listarTodosCompromissos() {
-        List<Compromisso> compromissos = compromissoService.listarTodos();
+    private Long getUsuarioIdAutenticado(Usuario usuarioAutenticado) {
+        if (usuarioAutenticado == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário não autenticado.");
+        }
+        return usuarioAutenticado.getId();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Compromisso>> listarCompromissosDoUsuario(
+            @AuthenticationPrincipal Usuario usuarioAutenticado) {
+        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
+        List<Compromisso> compromissos = compromissoService.listarPorUsuario(usuarioId);
         return ResponseEntity.ok(compromissos);
     }
 
-    @GetMapping("/{id}") // HTTP GET para /api/compromissos/{id}
-    public ResponseEntity<Compromisso> buscarCompromissoPorId(@PathVariable Long id) {
-        return compromissoService.buscarPorId(id)
-                .map(ResponseEntity::ok) // Se encontrado, retorna 200 OK com o compromisso
-                .orElse(ResponseEntity.notFound().build()); // Se não, retorna 404 Not Found
+    @GetMapping("/{id}")
+    public ResponseEntity<Compromisso> buscarCompromissoPorId(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Usuario usuarioAutenticado) {
+        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
+        return compromissoService.buscarPorIdEUsuarioId(id, usuarioId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping // HTTP POST para /api/compromissos
-    @ResponseStatus(HttpStatus.CREATED) // Define o status de resposta para 201 Created
-    public Compromisso criarCompromisso(@RequestBody Compromisso compromisso) {
-        // @RequestBody converte o JSON do corpo da requisição para o objeto Compromisso
-        return compromissoService.salvar(compromisso);
-    }
-
-    @PutMapping("/{id}") // HTTP PUT para /api/compromissos/{id}
-    public ResponseEntity<Compromisso> atualizarCompromisso(@PathVariable Long id, @RequestBody Compromisso compromisso) {
+    @PostMapping
+    public ResponseEntity<Compromisso> criarCompromisso(
+            @RequestBody CompromissoDTO compromissoDTO,
+            @AuthenticationPrincipal Usuario usuarioAutenticado) {
+        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
         try {
-            Compromisso compromissoAtualizado = compromissoService.atualizar(id, compromisso);
-            return ResponseEntity.ok(compromissoAtualizado);
-        } catch (RuntimeException e) { // Exemplo de tratamento de exceção
-            return ResponseEntity.notFound().build();
+            Compromisso novoCompromisso = compromissoDTO.toEntity();
+            Compromisso compromissoSalvo = compromissoService.salvar(novoCompromisso, usuarioId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(compromissoSalvo);
+        } catch (IllegalArgumentException e) {
+             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
     }
 
-    @DeleteMapping("/{id}") // HTTP DELETE para /api/compromissos/{id}
-    public ResponseEntity<Void> deletarCompromisso(@PathVariable Long id) {
+    @PutMapping("/{id}")
+    public ResponseEntity<Compromisso> atualizarCompromisso(
+            @PathVariable Long id,
+            @RequestBody CompromissoDTO compromissoDTO,
+            @AuthenticationPrincipal Usuario usuarioAutenticado) {
+        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
         try {
-            compromissoService.deletarPorId(id);
-            return ResponseEntity.noContent().build(); // Retorna 204 No Content
-        } catch (RuntimeException e) { // Exemplo de tratamento de exceção
-            return ResponseEntity.notFound().build();
+            Compromisso compromissoAtualizado = compromissoDTO.toEntity();
+            Compromisso salvo = compromissoService.atualizar(id, compromissoAtualizado, usuarioId);
+            return ResponseEntity.ok(salvo);
+        } catch (RuntimeException e) { // Pode ser mais específico (ex: CompromissoNaoEncontradoException)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletarCompromisso(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Usuario usuarioAutenticado) {
+        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
+        try {
+            compromissoService.deletarPorIdEUsuarioId(id, usuarioId);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) { // Pode ser mais específico
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
 }

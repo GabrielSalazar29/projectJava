@@ -1,12 +1,17 @@
 package com.agendacompromissos.V1.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import java.time.LocalDateTime; // Importe LocalDateTime
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table; 
+import java.time.LocalDateTime;
 
-@Entity // Anotação para indicar que esta classe é uma entidade JPA
+@Entity
+@Table(name = "compromissos")
 
 public class Compromisso {
 
@@ -19,14 +24,19 @@ public class Compromisso {
     private LocalDateTime dataHoraFim;
     private String local;
 
+    @ManyToOne(fetch = FetchType.LAZY) // Muitos compromissos para UM usuário. LAZY é bom para performance.
+    @JoinColumn(name = "usuario_id", nullable = false) // Define a coluna da chave estrangeira e que não pode ser nula
+    private Usuario usuario; // Referência ao proprietário do compromisso
+
     public Compromisso() {
     }
 
-    public Compromisso(String descricao, LocalDateTime dataHoraInicio, LocalDateTime dataHoraFim, String local) {
+    public Compromisso(String descricao, LocalDateTime dataHoraInicio, LocalDateTime dataHoraFim, String local, Usuario usuario) {
         this.descricao = descricao;
         this.dataHoraInicio = dataHoraInicio;
         this.dataHoraFim = dataHoraFim;
         this.local = local;
+        this.usuario = usuario;
     }
 
     public Long getId() {
@@ -67,6 +77,14 @@ public class Compromisso {
 
     public void setLocal(String local) {
         this.local = local;
+    }
+
+    public Usuario getUsuario() {
+        return usuario;
+    }
+
+    public void setUsuario(Usuario usuario) {
+        this.usuario = usuario;
     }
 
     // toString, equals, hashCode (opcional, mas bom para debugging)
