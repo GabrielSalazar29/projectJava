@@ -1,17 +1,24 @@
 package com.agendacompromissos.V1.config;
 
+import com.agendacompromissos.V1.security.jwt.JwtRequestFilter;
 import com.agendacompromissos.V1.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.access.AccessDeniedHandler; // Para tratar 403
+import org.springframework.security.web.AuthenticationEntryPoint; // Para tratar 401
+import jakarta.servlet.http.HttpServletResponse; // Para os handlers
+import java.util.Date;
 
 @Configuration
 @EnableWebSecurity
@@ -20,40 +27,70 @@ public class SecurityConfig {
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
 
+    @Autowired
+    private JwtRequestFilter jwtRequestFilter;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // Considere as implicações de segurança ao desabilitar CSRF
+            // 1. Desabilitar CSRF (comum para APIs stateless)
+            .csrf(csrf -> csrf.disable())
+            // 2. Configurar a política de criação de sessão para STATELESS
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 3. Configurar regras de autorização para os endpoints
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers(HttpMethod.POST, "/api/usuarios/registrar").permitAll()
-                // Para a API de compromissos, agora todos os usuários autenticados podem acessar
-                .requestMatchers("/api/compromissos/**").authenticated() // Protege todos os endpoints de compromissos
-                .anyRequest().authenticated() // Qualquer outra requisição também precisa de autenticação
+                .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll() // Endpoint de login
+                .requestMatchers(HttpMethod.POST, "/api/usuarios/registrar").permitAll() // Endpoint de registro    
+                .requestMatchers("/api/compromissos/**").authenticated() // Proteger endpoints de compromissos
+                .anyRequest().authenticated() // Qualquer outra requisição precisa de autenticação
             )
-            .formLogin(formLogin -> formLogin
-            .defaultSuccessUrl("/api/compromissos", true)
-                .permitAll()
+            // 4. Adicionar o filtro JWT antes do filtro de UsernamePasswordAuthenticationFilter
+            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+            // 5. Configurar Exception Handling para erros de autenticação e autorização
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(authenticationEntryPoint()) // Lida com falhas de autenticação (401)
+                .accessDeniedHandler(accessDeniedHandler())       // Lida com falhas de autorização (403)
             )
-            .logout(logout -> logout
-                .permitAll()
-            )
-            .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
+            .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin())); // Para console H2
 
         return http.build();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
-        AuthenticationManagerBuilder authenticationManagerBuilder =
-                http.getSharedObject(AuthenticationManagerBuilder.class);
-        authenticationManagerBuilder
-                .userDetailsService(customUserDetailsService)
-                .passwordEncoder(passwordEncoder());
-        return authenticationManagerBuilder.build();
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        // Retorna 401 Unauthorized para tentativas de acesso não autenticadas a recursos protegidos
+        return (request, response, authException) -> {
+            response.setContentType("application/json;charset=UTF-8");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"timestamp\": \"" + new Date() + "\","
+                                     + "\"status\": 401,"
+                                     + "\"error\": \"Unauthorized\","
+                                     + "\"message\": \"" + authException.getMessage() + "\","
+                                     + "\"path\": \"" + request.getRequestURI() + "\"}");
+        };
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        // Retorna 403 Forbidden se um usuário autenticado tenta acessar um recurso que não tem permissão
+        return (request, response, accessDeniedException) -> {
+            response.setContentType("application/json;charset=UTF-8");
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("{\"timestamp\": \"" + new Date() + "\","
+                                     + "\"status\": 403,"
+                                     + "\"error\": \"Forbidden\","
+                                     + "\"message\": \"" + accessDeniedException.getMessage() + "\","
+                                     + "\"path\": \"" + request.getRequestURI() + "\"}");
+        };
     }
 }
