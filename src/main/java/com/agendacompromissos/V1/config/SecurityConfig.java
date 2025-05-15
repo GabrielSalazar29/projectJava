@@ -20,6 +20,12 @@ import org.springframework.security.web.AuthenticationEntryPoint; // Para tratar
 import jakarta.servlet.http.HttpServletResponse; // Para os handlers
 import java.util.Date;
 
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
+import java.util.List; 
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -43,6 +49,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             // 1. Desabilitar CSRF (comum para APIs stateless)
             .csrf(csrf -> csrf.disable())
             // 2. Configurar a política de criação de sessão para STATELESS
@@ -64,6 +71,39 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin())); // Para console H2
 
         return http.build();
+    }
+
+     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173"
+        ));
+        // Métodos HTTP permitidos
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        // Cabeçalhos permitidos na requisição
+        // "Authorization" é crucial para JWT. "Content-Type" é comum.
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type"
+        ));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L); // 1 hora
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Aplica esta configuração para todos os paths sob /api/
+        // Ajuste o padrão do path conforme necessário (ex: "/**" para todos os paths)
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
     }
 
     @Bean
