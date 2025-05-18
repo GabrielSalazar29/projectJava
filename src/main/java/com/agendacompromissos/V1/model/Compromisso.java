@@ -19,6 +19,7 @@ public class Compromisso {
     @GeneratedValue(strategy = GenerationType.IDENTITY) // Gerador de ID autoincremental
     private Long id;
 
+    private String titulo;
     private String descricao;
     private LocalDateTime dataHoraInicio; // Use LocalDateTime para data e hora
     private LocalDateTime dataHoraFim;
@@ -31,7 +32,8 @@ public class Compromisso {
     public Compromisso() {
     }
 
-    public Compromisso(String descricao, LocalDateTime dataHoraInicio, LocalDateTime dataHoraFim, String local, Usuario usuario) {
+    public Compromisso(String titulo, String descricao, LocalDateTime dataHoraInicio, LocalDateTime dataHoraFim, String local, Usuario usuario) {
+        this.titulo = titulo;
         this.descricao = descricao;
         this.dataHoraInicio = dataHoraInicio;
         this.dataHoraFim = dataHoraFim;
@@ -45,6 +47,14 @@ public class Compromisso {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getTitulo() {
+        return titulo;
+    }
+
+    public void setTitulo(String titulo) {
+        this.titulo = titulo;
     }
 
     public String getDescricao() {

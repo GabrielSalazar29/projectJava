@@ -16,12 +16,15 @@ import java.util.List;
 // DTO para receber dados de criação/atualização de compromisso
 // Não inclui o usuário, pois será pego do contexto de segurança
 class CompromissoDTO {
+    private String titulo;
     private String descricao;
     private LocalDateTime dataHoraInicio;
     private LocalDateTime dataHoraFim;
     private String local;
 
     // Getters e Setters
+    public String getTitulo() {return titulo;}
+    public void setTitulo(String titulo) {this.titulo = titulo;}
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }
     public LocalDateTime getDataHoraInicio() { return dataHoraInicio; }
@@ -34,6 +37,7 @@ class CompromissoDTO {
     // Método para converter DTO para Entidade (sem o usuário)
     public Compromisso toEntity() {
         Compromisso compromisso = new Compromisso();
+        compromisso.setTitulo(this.titulo);
         compromisso.setDescricao(this.descricao);
         compromisso.setDataHoraInicio(this.dataHoraInicio);
         compromisso.setDataHoraFim(this.dataHoraFim);

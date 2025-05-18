@@ -65,6 +65,7 @@ public class CompromissoService {
             .orElseThrow(() -> new RuntimeException("Compromisso não encontrado ou não pertence ao usuário. ID: " + id));
 
         // Atualiza os campos do compromisso existente
+        compromissoExistente.setTitulo(compromissoAtualizado.getTitulo());
         compromissoExistente.setDescricao(compromissoAtualizado.getDescricao());
         compromissoExistente.setDataHoraInicio(compromissoAtualizado.getDataHoraInicio());
         compromissoExistente.setDataHoraFim(compromissoAtualizado.getDataHoraFim());
