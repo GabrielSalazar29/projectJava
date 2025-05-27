@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal; // Para injetar o usuário logado
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException; // Para exceções HTTP
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 // DTO para receber dados de criação/atualização de compromisso
@@ -18,8 +18,8 @@ import java.util.List;
 class CompromissoDTO {
     private String titulo;
     private String descricao;
-    private LocalDateTime dataHoraInicio;
-    private LocalDateTime dataHoraFim;
+    private Instant  dataHoraInicio;
+    private Instant  dataHoraFim;
     private String local;
 
     // Getters e Setters
@@ -27,10 +27,10 @@ class CompromissoDTO {
     public void setTitulo(String titulo) {this.titulo = titulo;}
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }
-    public LocalDateTime getDataHoraInicio() { return dataHoraInicio; }
-    public void setDataHoraInicio(LocalDateTime dataHoraInicio) { this.dataHoraInicio = dataHoraInicio; }
-    public LocalDateTime getDataHoraFim() { return dataHoraFim; }
-    public void setDataHoraFim(LocalDateTime dataHoraFim) { this.dataHoraFim = dataHoraFim; }
+    public Instant  getDataHoraInicio() { return dataHoraInicio; }
+    public void setDataHoraInicio(Instant  dataHoraInicio) { this.dataHoraInicio = dataHoraInicio; }
+    public Instant  getDataHoraFim() { return dataHoraFim; }
+    public void setDataHoraFim(Instant  dataHoraFim) { this.dataHoraFim = dataHoraFim; }
     public String getLocal() { return local; }
     public void setLocal(String local) { this.local = local; }
 
