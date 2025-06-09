@@ -4,6 +4,9 @@ import com.agendacompromissos.V1.model.Compromisso;
 import com.agendacompromissos.V1.model.Usuario; // Importe Usuario
 import com.agendacompromissos.V1.service.CompromissoService;
 
+import jakarta.validation.Valid;
+
+import com.agendacompromissos.V1.dto.CompromissoCreateDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,9 +70,11 @@ public class CompromissoController {
 
     @GetMapping
     public ResponseEntity<List<Compromisso>> listarCompromissosDoUsuario(
-            @AuthenticationPrincipal Usuario usuarioAutenticado) {
-        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
-        List<Compromisso> compromissos = compromissoService.listarPorUsuario(usuarioId);
+            @AuthenticationPrincipal Usuario currentUser) {
+        // Este método agora retorna compromissos onde o usuário é um participante
+        List<Compromisso> compromissos = compromissoService.listarPorUsuario(currentUser.getId());
+        // TODO: Mapear para um DTO de resposta para evitar loops de serialização
+        // e expor dados de forma controlada.
         return ResponseEntity.ok(compromissos);
     }
 
@@ -85,43 +90,30 @@ public class CompromissoController {
 
     @PostMapping
     public ResponseEntity<Compromisso> criarCompromisso(
-            @RequestBody CompromissoDTO compromissoDTO,
-            @AuthenticationPrincipal Usuario usuarioAutenticado) {
-        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
-        try {
-            Compromisso novoCompromisso = compromissoDTO.toEntity();
-            Compromisso compromissoSalvo = compromissoService.salvar(novoCompromisso, usuarioId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(compromissoSalvo);
-        } catch (IllegalArgumentException e) {
-             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+            @RequestBody CompromissoCreateDTO compromissoDTO, // Usa o novo DTO
+            @AuthenticationPrincipal Usuario currentUser) {
+        
+        // A validação do DTO (com @Valid) seria ideal aqui
+        Compromisso compromissoSalvo = compromissoService.salvarCompartilhado(compromissoDTO, currentUser.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(compromissoSalvo);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Compromisso> atualizarCompromisso(
             @PathVariable Long id,
-            @RequestBody CompromissoDTO compromissoDTO,
-            @AuthenticationPrincipal Usuario usuarioAutenticado) {
-        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
-        try {
-            Compromisso compromissoAtualizado = compromissoDTO.toEntity();
-            Compromisso salvo = compromissoService.atualizar(id, compromissoAtualizado, usuarioId);
-            return ResponseEntity.ok(salvo);
-        } catch (RuntimeException e) { // Pode ser mais específico (ex: CompromissoNaoEncontradoException)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+            @Valid @RequestBody CompromissoCreateDTO compromissoDTO,
+            @AuthenticationPrincipal Usuario currentUser) {
+        
+        Compromisso compromissoAtualizado = compromissoService.atualizar(id, compromissoDTO, currentUser.getId());
+        return ResponseEntity.ok(compromissoAtualizado);
     }
-
+    
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarCompromisso(
             @PathVariable Long id,
-            @AuthenticationPrincipal Usuario usuarioAutenticado) {
-        Long usuarioId = getUsuarioIdAutenticado(usuarioAutenticado);
-        try {
-            compromissoService.deletarPorIdEUsuarioId(id, usuarioId);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) { // Pode ser mais específico
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+            @AuthenticationPrincipal Usuario currentUser) {
+            
+        compromissoService.deletar(id, currentUser.getId());
+        return ResponseEntity.noContent().build();
     }
 }

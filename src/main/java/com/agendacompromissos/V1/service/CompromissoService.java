@@ -1,83 +1,95 @@
 package com.agendacompromissos.V1.service;
 
+import com.agendacompromissos.V1.dto.CompromissoCreateDTO;
 import com.agendacompromissos.V1.model.Compromisso;
 import com.agendacompromissos.V1.model.Usuario;
 import com.agendacompromissos.V1.repository.CompromissoRepository;
-import com.agendacompromissos.V1.repository.UsuarioRepository; // Para buscar o usuário
+import com.agendacompromissos.V1.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.userdetails.UsernameNotFoundException; // Para usuário não encontrado
+import org.springframework.security.access.AccessDeniedException; // Importação necessária
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Boa prática para métodos de escrita
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class CompromissoService {
 
+    private final UsuarioRepository usuarioRepository;
     private final CompromissoRepository compromissoRepository;
-    private final UsuarioRepository usuarioRepository; // Adicionado para buscar o usuário
 
     @Autowired
-    public CompromissoService(CompromissoRepository compromissoRepository, UsuarioRepository usuarioRepository) {
-        this.compromissoRepository = compromissoRepository;
+    public CompromissoService(UsuarioRepository usuarioRepository, CompromissoRepository compromissoRepository) {
         this.usuarioRepository = usuarioRepository;
+        this.compromissoRepository = compromissoRepository;
     }
 
-    // Lista compromissos apenas para o usuário logado
-    @Transactional(readOnly = true) // Boa prática para métodos de leitura
-    public List<Compromisso> listarPorUsuario(Long usuarioId) {
-        return compromissoRepository.findByUsuarioId(usuarioId);
-    }
+    @Transactional
+    public Compromisso salvarCompartilhado(CompromissoCreateDTO dto, Long criadorId) {
+        Usuario criador = usuarioRepository.findById(criadorId)
+                .orElseThrow(() -> new EntityNotFoundException("Criador não encontrado com ID: " + criadorId));
 
-    // Busca um compromisso específico do usuário logado
+        Compromisso novoCompromisso = new Compromisso();
+        novoCompromisso.setTitulo(dto.getTitulo());
+        novoCompromisso.setDescricao(dto.getDescricao());
+        novoCompromisso.setDataHoraInicio(dto.getDataHoraInicio());
+        novoCompromisso.setDataHoraFim(dto.getDataHoraFim());
+        novoCompromisso.setLocal(dto.getLocal());
+        novoCompromisso.setCriador(criador);
+
+        Set<Usuario> participantes = new HashSet<>();
+        participantes.add(criador);
+
+        if (dto.getAmigoIds() != null && !dto.getAmigoIds().isEmpty()) {
+            List<Usuario> amigosConvidados = usuarioRepository.findAllById(dto.getAmigoIds());
+            participantes.addAll(amigosConvidados);
+        }
+        
+        novoCompromisso.setParticipantes(participantes);
+        return compromissoRepository.save(novoCompromisso);
+    }
+    
     @Transactional(readOnly = true)
-    public Optional<Compromisso> buscarPorIdEUsuarioId(Long id, Long usuarioId) {
-        return compromissoRepository.findByIdAndUsuarioId(id, usuarioId);
+    public List<Compromisso> listarPorUsuario(Long usuarioId) {
+        return compromissoRepository.findByParticipantes_Id(usuarioId);
     }
 
+    // ---- MÉTODO ATUALIZAR CORRIGIDO ----
     @Transactional
-    public Compromisso salvar(Compromisso compromisso, Long usuarioId) {
-        // Busca o usuário pelo ID para associá-lo ao compromisso
-        Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com ID: " + usuarioId));
-        compromisso.setUsuario(usuario); // Associa o usuário ao compromisso
+    public Compromisso atualizar(Long compromissoId, CompromissoCreateDTO dto, Long editorId) {
+        // 1. Busca o compromisso pelo seu ID e pelo ID do utilizador que está a tentar editar (que deve ser o criador)
+        Compromisso compromissoExistente = compromissoRepository.findByIdAndCriador_Id(compromissoId, editorId)
+            .orElseThrow(() -> new AccessDeniedException("Compromisso não encontrado ou você não tem permissão para editá-lo."));
 
-        // Validações de negócio
-        if (compromisso.getDataHoraFim() != null && compromisso.getDataHoraInicio() != null &&
-            compromisso.getDataHoraFim().isBefore(compromisso.getDataHoraInicio())) {
-            throw new IllegalArgumentException("A data/hora de término não pode ser anterior à data/hora de início.");
+        // 2. Atualiza os campos do compromisso existente com os dados do DTO
+        compromissoExistente.setTitulo(dto.getTitulo());
+        compromissoExistente.setDescricao(dto.getDescricao());
+        compromissoExistente.setDataHoraInicio(dto.getDataHoraInicio());
+        compromissoExistente.setDataHoraFim(dto.getDataHoraFim());
+        compromissoExistente.setLocal(dto.getLocal());
+
+        // 3. Atualiza a lista de participantes
+        Set<Usuario> novosParticipantes = new HashSet<>();
+        novosParticipantes.add(compromissoExistente.getCriador()); // O criador está sempre na lista
+        if (dto.getAmigoIds() != null && !dto.getAmigoIds().isEmpty()) {
+            List<Usuario> amigosConvidados = usuarioRepository.findAllById(dto.getAmigoIds());
+            novosParticipantes.addAll(amigosConvidados);
         }
-        return compromissoRepository.save(compromisso);
-    }
-
-    @Transactional
-    public void deletarPorIdEUsuarioId(Long id, Long usuarioId) {
-        Compromisso compromisso = compromissoRepository.findByIdAndUsuarioId(id, usuarioId)
-                .orElseThrow(() -> new RuntimeException("Compromisso não encontrado ou não pertence ao usuário. ID: " + id));
-        compromissoRepository.delete(compromisso);
-    }
-
-    @Transactional
-    public Compromisso atualizar(Long id, Compromisso compromissoAtualizado, Long usuarioId) {
-        // Busca o compromisso existente, garantindo que pertence ao usuário
-        Compromisso compromissoExistente = compromissoRepository.findByIdAndUsuarioId(id, usuarioId)
-            .orElseThrow(() -> new RuntimeException("Compromisso não encontrado ou não pertence ao usuário. ID: " + id));
-
-        // Atualiza os campos do compromisso existente
-        compromissoExistente.setTitulo(compromissoAtualizado.getTitulo());
-        compromissoExistente.setDescricao(compromissoAtualizado.getDescricao());
-        compromissoExistente.setDataHoraInicio(compromissoAtualizado.getDataHoraInicio());
-        compromissoExistente.setDataHoraFim(compromissoAtualizado.getDataHoraFim());
-        compromissoExistente.setLocal(compromissoAtualizado.getLocal());
-        // O usuário não deve mudar na atualização, já foi verificado
-
-        // Adicione validações de negócio aqui também
-        if (compromissoExistente.getDataHoraFim() != null && compromissoExistente.getDataHoraInicio() != null &&
-            compromissoExistente.getDataHoraFim().isBefore(compromissoExistente.getDataHoraInicio())) {
-            throw new IllegalArgumentException("A data/hora de término não pode ser anterior à data/hora de início.");
-        }
+        compromissoExistente.setParticipantes(novosParticipantes);
 
         return compromissoRepository.save(compromissoExistente);
+    }
+
+    // ---- MÉTODO DELETAR CORRIGIDO ----
+    @Transactional
+    public void deletar(Long compromissoId, Long editorId) {
+        // Busca o compromisso para garantir que apenas o criador pode deletar
+        Compromisso compromissoParaDeletar = compromissoRepository.findByIdAndCriador_Id(compromissoId, editorId)
+            .orElseThrow(() -> new AccessDeniedException("Compromisso não encontrado ou você não tem permissão para excluí-lo."));
+
+        compromissoRepository.delete(compromissoParaDeletar);
     }
 }

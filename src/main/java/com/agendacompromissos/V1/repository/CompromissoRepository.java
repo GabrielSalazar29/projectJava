@@ -12,15 +12,10 @@ import java.util.Optional; // Para o novo método
 @Repository
 public interface CompromissoRepository extends JpaRepository<Compromisso, Long> {
 
-    // Métodos de consulta personalizados existentes (se houver)
-    List<Compromisso> findByDescricaoContainingIgnoreCase(String descricao);
-    List<Compromisso> findByDataHoraInicioBetween(LocalDateTime inicio, LocalDateTime fim);
-
-    // Novos métodos para buscar compromissos por usuário
-    List<Compromisso> findByUsuario(Usuario usuario);
-
-    List<Compromisso> findByUsuarioId(Long usuarioId);
-
-    // Para buscar um compromisso específico de um usuário específico
-    Optional<Compromisso> findByIdAndUsuarioId(Long id, Long usuarioId);
+    // Busca todos os compromissos onde o utilizador (pelo seu ID) está na lista de participantes.
+    List<Compromisso> findByParticipantes_Id(Long usuarioId);
+    
+    // NOVO MÉTODO: Busca um compromisso específico pelo seu ID E pelo ID do seu criador.
+    // Isso garante que apenas o criador possa encontrar o compromisso para editar/excluir.
+    Optional<Compromisso> findByIdAndCriador_Id(Long id, Long criadorId);
 }
