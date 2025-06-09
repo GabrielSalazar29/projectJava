@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll() // Endpoint de login
                 .requestMatchers(HttpMethod.POST, "/api/usuarios/registrar").permitAll() // Endpoint de registro    
                 .requestMatchers("/api/compromissos/**").authenticated() // Proteger endpoints de compromissos
+                .requestMatchers("/api/amizades/**").authenticated() // Protege todos os endpoints de amizade
                 .anyRequest().authenticated() // Qualquer outra requisição precisa de autenticação
             )
             // 4. Adicionar o filtro JWT antes do filtro de UsernamePasswordAuthenticationFilter

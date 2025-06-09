@@ -1,13 +1,21 @@
 package com.agendacompromissos.V1.controller;
 
+import com.agendacompromissos.V1.dto.UsuarioSummaryDTO;
 import com.agendacompromissos.V1.model.Usuario;
+import com.agendacompromissos.V1.repository.UsuarioRepository;
 import com.agendacompromissos.V1.service.UsuarioService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -44,6 +52,9 @@ public class UsuarioController {
     @Autowired
     private UsuarioService usuarioService;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository; // Para a busca
+
     /**
      * Endpoint para registrar um novo usuário no sistema.
      * Recebe os dados do usuário através do corpo da requisição (JSON).
@@ -67,14 +78,28 @@ public class UsuarioController {
             Usuario usuarioSalvo = usuarioService.registrarNovoUsuario(novoUsuario);
 
             // É uma boa prática não retornar a senha (mesmo hasheada) na resposta da API.
-            // Criar um DTO de resposta específico para o usuário seria ainda melhor,
-            // mas para simplificar, vamos apenas setar a senha para null no objeto retornado.
-            usuarioSalvo.setPassword(null);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(usuarioSalvo);
+            UsuarioSummaryDTO usuarioResponse = new UsuarioSummaryDTO(usuarioSalvo.getId(), usuarioSalvo.getUsername());
+            return ResponseEntity.status(HttpStatus.CREATED).body(usuarioResponse);
         } catch (Exception e) {
             // Em caso de erro (ex: nome de usuário já existe), retorna uma mensagem de erro.
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+     // NOVO ENDPOINT PARA BUSCAR USUÁRIOS
+    @GetMapping("/buscar")
+    public ResponseEntity<List<UsuarioSummaryDTO>> buscarUsuarios(
+            @RequestParam("termo") String termo,
+            @AuthenticationPrincipal Usuario currentUser) {
+        if (termo == null || termo.trim().length() < 2) { // Não busca por termos muito curtos
+            return ResponseEntity.badRequest().body(List.of());
+        }
+        // Busca usuários cujo nome contém o termo, excluindo o próprio usuário logado
+        List<Usuario> usuariosEncontrados = usuarioRepository.findByUsernameContainingIgnoreCaseAndIdNot(termo.trim(), currentUser.getId());
+        
+        List<UsuarioSummaryDTO> dtos = usuariosEncontrados.stream()
+                .map(u -> new UsuarioSummaryDTO(u.getId(), u.getUsername()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 }
