@@ -1,9 +1,10 @@
 package com.agendacompromissos.V1.controller;
-
 import com.agendacompromissos.V1.dto.AuthRequestDTO;
-import com.agendacompromissos.V1.dto.AuthResponseDTO;
+import com.agendacompromissos.V1.dto.AuthResponseDTO; // Importe o novo DTO
+import com.agendacompromissos.V1.dto.UsuarioSummaryDTO; // Importe o DTO de resumo
+import com.agendacompromissos.V1.model.Usuario; // Importe a sua entidade Usuario
 import com.agendacompromissos.V1.security.jwt.JwtUtil;
-import com.agendacompromissos.V1.service.CustomUserDetailsService; // Seu UserDetailsService
+import com.agendacompromissos.V1.service.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,26 +27,37 @@ public class AuthController {
     private JwtUtil jwtUtil;
 
     @Autowired
-    private CustomUserDetailsService userDetailsService; // Seu UserDetailsService
+    private CustomUserDetailsService userDetailsService;
 
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthRequestDTO authRequest) throws Exception {
         try {
-            // Autentica o usuário com o AuthenticationManager
+            // Autentica o utilizador com o AuthenticationManager
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
             );
         } catch (BadCredentialsException e) {
-            throw new Exception("Usuário ou senha inválidos", e);
+            // Se as credenciais forem inválidas, lança uma exceção que será tratada
+            throw new Exception("Utilizador ou senha inválidos", e);
         }
 
-        // Se a autenticação for bem-sucedida, carrega UserDetails
+        // Se a autenticação for bem-sucedida, carrega UserDetails para gerar o token
         final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getUsername());
+
+        // MUDANÇA: Como o nosso UserDetails é a própria entidade Usuario, podemos fazer o cast
+        // para obter o objeto completo e o seu ID.
+        if (!(userDetails instanceof Usuario)) {
+             throw new Exception("Erro interno: UserDetails não é uma instância de Usuario.");
+        }
+        final Usuario usuarioCompleto = (Usuario) userDetails;
 
         // Gera o token JWT
         final String jwt = jwtUtil.generateToken(userDetails);
-
-        // Retorna o token na resposta
-        return ResponseEntity.ok(new AuthResponseDTO(jwt));
+        
+        // MUDANÇA: Cria o DTO de resumo do utilizador
+        UsuarioSummaryDTO userDto = new UsuarioSummaryDTO(usuarioCompleto.getId(), usuarioCompleto.getUsername());
+        
+        // MUDANÇA: Retorna a nova classe de resposta que contém o token E os dados do utilizador
+        return ResponseEntity.ok(new AuthResponseDTO(jwt, userDto));
     }
 }
