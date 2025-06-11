@@ -26,7 +26,7 @@ A "Agenda de Compromissos" é uma aplicação robusta e interativa projetada par
 
 ### Back-end (Spring Boot - Java)
 
-* **Linguagem:** Java 17
+* **Linguagem:** Java 24
 * **Framework:** Spring Boot 3.x
 * **Persistência:** Spring Data JPA, Hibernate
 * **Banco de Dados:** PostgreSQL
